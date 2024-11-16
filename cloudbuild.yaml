@@ -15,3 +15,6 @@ steps:
 
 images:
 - 'asia-southeast2-docker.pkg.dev/$PROJECT_ID/${_SERVICE_NAME}/trigger'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
