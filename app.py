@@ -95,11 +95,11 @@ if uploaded_file is not None:
     st.sidebar.metric("Total Overtime Frequency (Days)", total_overtime_frequency)
 
     # Visualization: Monthly Overtime Frequency Trend
-    overtime_days['month'] = overtime_days['tanggal'].dt.to_period('M')
+    overtime_days['month'] = overtime_days['tanggal'].dt.month
     overtime_frequency_monthly_trend = (
         overtime_days.groupby('month')
         .size()
-        .sort_index()
+        .reindex(range(1, 13), fill_value=0)  # Ensure all months (1-12) are present
     )
     st.subheader("Monthly Overtime Frequency Trend")
     st.line_chart(overtime_frequency_monthly_trend.rename("Frekuensi Lembur per Bulan"))
@@ -132,11 +132,12 @@ if uploaded_file is not None:
     st.bar_chart(avg_hours_by_generation.rename("Rata-rata Jam Kerja (jam)"))
 
     # Visualization 5: Monthly Average Working Hours per Day (by jk_keterangan_name)
-    filtered_data['month'] = filtered_data['tanggal'].dt.to_period('M')
+    filtered_data['month'] = filtered_data['tanggal'].dt.month
     avg_hours_by_jk_and_month = (
         filtered_data.groupby(['month', 'jk_keterangan_name'])['jumlah_jam_kerja']
         .mean()
         .unstack()
+        .reindex(range(1, 13), fill_value=0)  # Ensure all months (1-12) are present
         .fillna(0)
         .round()
         .astype(int)
@@ -145,15 +146,39 @@ if uploaded_file is not None:
     st.line_chart(avg_hours_by_jk_and_month.rename_axis("Bulan").rename(columns=lambda x: f"{x} (jam)"))
 
     # Visualization 6: Dynamic Monthly Trend Line for Average Working Hours
-    daily_avg_per_employee['month'] = daily_avg_per_employee['tanggal'].dt.to_period('M')
+    # Pastikan kolom 'tanggal' adalah tipe datetime
+    daily_avg_per_employee['tanggal'] = pd.to_datetime(daily_avg_per_employee['tanggal'], errors='coerce')
+
+    # Hapus data dengan nilai 'tanggal' yang invalid
+    daily_avg_per_employee = daily_avg_per_employee.dropna(subset=['tanggal'])
+
+    # Tambahkan kolom 'month' untuk representasi bulan
+    daily_avg_per_employee['month'] = daily_avg_per_employee['tanggal'].dt.month
+
+    # Hitung rata-rata jam kerja per bulan
     monthly_hours_trend = (
         daily_avg_per_employee.groupby('month')['jumlah_jam_kerja']
         .mean()
-        .fillna(0)
-        .round()
+        .reindex(range(1, 13), fill_value=0)  # Pastikan semua bulan (1-12) muncul
+        .round(2)  # Bulatkan ke 2 desimal
     )
+
+    # Buat DataFrame untuk memastikan pengurutan yang benar
+    monthly_hours_trend_df = monthly_hours_trend.reset_index()
+    monthly_hours_trend_df['month'] = monthly_hours_trend_df['month'].astype(str)
+    monthly_hours_trend_df['month'] = pd.Categorical(
+        monthly_hours_trend_df['month'], 
+        categories=[str(i) for i in range(1, 13)], 
+        ordered=True
+    )
+
+    # Ganti nama bulan untuk ditampilkan
+    monthly_hours_trend_df['month'] = monthly_hours_trend_df['month'].apply(lambda x: f"Bulan {x}")
+
+    # Visualisasi tren rata-rata jam kerja bulanan
     st.subheader("Monthly Average Working Hours Trend")
-    st.line_chart(monthly_hours_trend.rename("Rata-rata Jam Kerja (jam)"))
+    st.line_chart(monthly_hours_trend_df.set_index('month')['jumlah_jam_kerja'].rename("Rata-rata Jam Kerja (jam)"))
+
 
     # Additional Visualization: Count of Employees Working Less Than 9 Hours per Compartment
     st.subheader("Count of Employees Working Less Than 9 Hours by Compartment")
